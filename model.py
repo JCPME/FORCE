@@ -13,12 +13,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.impute import SimpleImputer
 import random
 import warnings
-from sklearn.metrics import confusion_matrix, classification_report, roc_auc_score
-from collections import Counter
+from sklearn.metrics import confusion_matrix, classification_report, roc_auc_score, auc, roc_curve
 from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
 from tqdm import tqdm
+
 
 warnings.filterwarnings("ignore")
 sns.set(style="whitegrid")
@@ -985,8 +983,7 @@ print(f"Validation ROC-AUC: {roc_auc:.4f}")
 cm = confusion_matrix(all_labels, all_preds)
 print("Confusion Matrix:\n", cm)
 
-# ROC Curve
-from sklearn.metrics import roc_curve, auc
+
 
 fpr, tpr, thresholds = roc_curve(all_labels, all_probs)
 roc_auc = auc(fpr, tpr)
@@ -1002,116 +999,7 @@ plt.title('Receiver Operating Characteristic (ROC)')
 plt.legend(loc="lower right")
 plt.show()
 
-# %%
-# ==================================
-# Visualization: Quaternion Trajectory Animation
-# ==================================
-import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-from matplotlib.animation import FuncAnimation
-from IPython.display import HTML
 
-# ----------------------------
-# 1) Extract the entire trajectory from row 0
-# ----------------------------
-# Suppose df is your DataFrame
-# df['translation_array'][0] -> a list of [x,y,z]
-# df['rotation_array'][0]    -> a list of [qx,qy,qz,qw]
-
-positions = np.array(df['translation_array'].iloc[0])   # shape (N, 3)
-quaternions = np.array(df['rotation_array'].iloc[0])    # shape (N, 4)
-num_frames = len(positions)
-
-# ----------------------------
-# 2) Define a helper to convert quaternion -> rotation matrix
-# ----------------------------
-def quaternion_to_rotation_matrix(q):
-    """
-    q: array-like [qx, qy, qz, qw]
-    Returns a 3x3 rotation matrix
-    """
-    qx, qy, qz, qw = q
-    norm = np.sqrt(qx*qx + qy*qy + qz*qz + qw*qw)
-    if norm < 1e-12:
-        # Avoid dividing by zero
-        qx, qy, qz, qw = 0, 0, 0, 1
-    else:
-        qx, qy, qz, qw = qx/norm, qy/norm, qz/norm, qw/norm
-
-    R = np.array([
-        [1 - 2*(qy**2 + qz**2),   2*(qx*qy - qz*qw),     2*(qx*qz + qy*qw)],
-        [  2*(qx*qy + qz*qw),   1 - 2*(qx**2 + qz**2),   2*(qy*qz - qx*qw)],
-        [  2*(qx*qz - qy*qw),     2*(qy*qz + qx*qw),   1 - 2*(qx**2 + qy**2)]
-    ], dtype=np.float64)
-    return R
-
-# ----------------------------
-# 3) Create a figure + 3D axes
-# ----------------------------
-fig = plt.figure(figsize=(8, 6), dpi=100)
-ax = fig.add_subplot(111, projection='3d')
-
-# Optional: set axis limits based on your data
-x_all, y_all, z_all = positions[:,0], positions[:,1], positions[:,2]
-ax.set_xlim(np.min(x_all)-1, np.max(x_all)+1)
-ax.set_ylim(np.min(y_all)-1, np.max(y_all)+1)
-ax.set_zlim(np.min(z_all)-1, np.max(z_all)+1)
-
-# Plot the entire path as reference
-ax.plot(x_all, y_all, z_all, 'gray', alpha=0.5)
-
-# We'll animate a single point + 3 local axes (the gimbal)
-point_plot, = ax.plot([], [], [], 'ro')
-gimbal_lines = [ax.plot([], [], [], lw=2)[0] for _ in range(3)]
-colors = ['r', 'g', 'b']  # x=red, y=green, z=blue
-
-# ----------------------------
-# 4) Define the update function for each frame
-# ----------------------------
-def update(frame):
-    # (a) Position + orientation at current frame
-    pos = positions[frame]
-    quat = quaternions[frame]
-    R = quaternion_to_rotation_matrix(quat)
-
-    # (b) Update the point
-    point_plot.set_data([pos[0]], [pos[1]])
-    point_plot.set_3d_properties([pos[2]])
-
-    # (c) Define local axes (e.g., X, Y, Z)
-    axis_length = 0.3
-    axes_body = axis_length * np.eye(3)  # shape (3,3)
-    # Rotate them by R
-    axes_world = R @ axes_body.T  # shape (3,3)
-
-    # (d) Update each gimbal axis
-    for i in range(3):
-        xdata = [pos[0], pos[0] + axes_world[0, i]]
-        ydata = [pos[1], pos[1] + axes_world[1, i]]
-        zdata = [pos[2], pos[2] + axes_world[2, i]]
-        gimbal_lines[i].set_data(xdata, ydata)
-        gimbal_lines[i].set_3d_properties(zdata)
-        gimbal_lines[i].set_color(colors[i])
-
-    return [point_plot, *gimbal_lines]
-
-# ----------------------------
-# 5) Build and display animation
-# ----------------------------
-anim = FuncAnimation(
-    fig,
-    update,
-    frames=range(0, num_frames, 50),  # skip frames for speed
-    interval=100,                    # ms per frame
-    blit=True
-)
-
-# Display in Jupyter Notebook
-HTML(anim.to_jshtml())
-
-# To save the animation as a GIF, uncomment the following line:
-# anim.save("quaternion_traj_animation.gif", writer="pillow")
 
 # %%
 # ==================================
@@ -1139,113 +1027,4 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 
-# ==================================
-# Feature Importance Extraction and Visualization
-# ==================================
 
-import matplotlib.colors as mcolors
-
-def extract_attention_weights(model, dataloader):
-    """
-    Extract attention weights from the model for all samples in the dataloader.
-
-    Parameters:
-        model (nn.Module): Trained model.
-        dataloader (DataLoader): DataLoader for the dataset.
-
-    Returns:
-        List of tuples: Each tuple contains (labels, predictions, attention_weights).
-    """
-    model.eval()
-    all_labels = []
-    all_preds = []
-    all_attention = []
-
-    with torch.no_grad():
-        for stft_features, additional_feats, labels in tqdm(dataloader, desc="Extracting Attention Weights"):
-            stft_features = stft_features.to(device)
-            additional_feats = additional_feats.to(device)
-            labels = labels.to(device).unsqueeze(1)
-
-            # Modify the model to return attention weights
-            outputs, attention = model(stft_features, additional_feats, return_attention=True)
-            probs = outputs.cpu().numpy().flatten()
-            preds = (outputs >= 0.5).float().cpu().numpy().flatten()
-            labels = labels.cpu().numpy().flatten()
-            attention = attention.cpu().numpy()  # Assuming attention shape: [batch, layers, heads, seq_len]
-
-            all_probs.extend(probs)
-            all_preds.extend(preds)
-            all_labels.extend(labels)
-            all_attention.extend(attention)
-
-    return list(zip(all_labels, all_preds, all_attention))
-
-def visualize_feature_importance(sample, attention_weights, label, filepath_prefix):
-    """
-    Visualize feature and sequence importance for a given sample using a 2D graph.
-    """
-    stft_2d, extra_feats = sample
-
-    # Aggregate attention weights across layers and heads
-    avg_attention = attention_weights.mean(axis=(0,1))  # shape: [seq_len]
-
-    # Normalize attention for visualization
-    if avg_attention.ndim == 0:
-        norm_attention = 1.0  # Single scalar attention
-    else:
-        norm_attention = (avg_attention - avg_attention.min()) / (avg_attention.max() - avg_attention.min())
-
-    # Extract corresponding trajectory
-    translation = np.array(df['translation_array'].iloc[0])   # shape (N, 3)
-    rotation = np.array(df['rotation_array'].iloc[0])        # shape (N, 4)
-    num_frames = len(translation)
-
-    # Calculate magnitude of translation and rotation
-    translation_magnitude = np.linalg.norm(translation, axis=1)
-    rotation_magnitude = np.linalg.norm(rotation, axis=1)
-
-    # Create 2D plot
-    plt.figure(figsize=(12, 8))
-
-    # Plot translation and rotation magnitudes
-    plt.subplot(2, 1, 1)
-    plt.plot(translation_magnitude, label='Translation Magnitude', color='blue')
-    plt.plot(rotation_magnitude, label='Rotation Magnitude', color='orange')
-    plt.title(f'Feature Importance for Label {label}')
-    plt.xlabel('Frame')
-    plt.ylabel('Magnitude')
-    plt.legend()
-
-    # Plot attention weights as a bar below
-    plt.subplot(2, 1, 2)
-    plt.bar(range(num_frames), norm_attention, color='gray', alpha=0.5)
-    plt.xlabel('Frame')
-    plt.ylabel('Normalized Attention')
-    plt.tight_layout()
-    plt.show()
-
-
-# After Model Evaluation
-# ==================================
-# Extract Attention Weights and Visualize Feature Importance
-# ==================================
-# Extract attention weights from the test set
-#attention_data = extract_attention_weights(model, test_loader)
-"""
-# Identify successful classifications for each label
-successful_classifications = {
-    0: [],  # Below Mean
-    1: []   # Above Mean
-    }
-for idx, (label, pred, attn) in enumerate(attention_data):
-    if label == pred:
-        successful_classifications[label].append(idx)# Visualize feature importance for each successful classification
-
-for label, indices in successful_classifications.items():
-    print(f"\nVisualizing Feature Importance for Label {label}")
-    for idx in indices[:5]:  # Limit to first 5 for brevity
-        sample = X_test_scaled[idx]
-        attention_weights = attention_data[idx][2]
-        visualize_feature_importance(sample, attention_weights, label, f"successful_class_{label}_sample_{idx}")
-"""
