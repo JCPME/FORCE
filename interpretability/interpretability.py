@@ -22,7 +22,7 @@ from tqdm import tqdm
 from captum.attr import Saliency, IntegratedGradients
 from tqdm import tqdm
 from typing import Tuple, List, Dict, Any
-import numpy as np
+
 
 warnings.filterwarnings("ignore")
 sns.set(style="whitegrid")
@@ -47,23 +47,6 @@ def stft_features_from_snippet(
     hop_length=128,
     fixed_time_frames=1500  # Padding to 1500 time frames
 ):
-    """
-    Returns a 2D time-frequency representation for each of the 7 axes,
-    then merges them so TCN can process (channels, time_frames).
-
-    Parameters:
-        translation_array (np.ndarray): Shape (N, 3)
-        rotation_array (np.ndarray): Shape (N, 4)
-        timestamp_array (np.ndarray): Shape (N,)
-        n_fft (int): Number of FFT components
-        hop_length (int): Number of samples between successive frames
-        fixed_time_frames (int): Desired number of time frames after padding/truncation
-
-    Returns:
-        np.ndarray: 2D array of shape [(7 * freq_bins), fixed_time_frames]
-    """
-    import torch
-    import numpy as np
 
     n = len(translation_array)
     if n < 2:
@@ -152,7 +135,6 @@ df = pd.read_pickle(data_path)
 
 # Check DataFrame columns and sample data
 print("Columns in DataFrame:", df.columns)
-
 
 # ------------------------------
 # 2) Create Binary Label (above/below mean avg_grs_score)
@@ -336,23 +318,16 @@ class FFTAdditionalDataset(Dataset):
         label = self.y[idx]
         return stft_2d, extra_feats, label
 
-# %%
-# ==================================
-# Create Datasets and DataLoaders
-# ==================================
 # Create Datasets
 train_dataset = FFTAdditionalDataset(X_analysis, y_analysis)
-
 
 # Define DataLoaders
 batch_size = 32
 
 analysis_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
 
-
 print("\nDataLoaders Created:")
 print(f"Train Loader: {len(analysis_loader)} batches")
-
 
 class Chomp1d(nn.Module):
     """
@@ -654,7 +629,6 @@ def extract_feature_importance_stft(
 
     return all_attributions_stft, all_labels, all_stfts, all_procedure_times
 
-
 def extract_feature_importance_extra(
     model_wrapper_extra: torch.nn.Module,
     dataloader: DataLoader,
@@ -788,7 +762,6 @@ def extract_attention_weights(
                 })
 
     return attention_data
-
 
 # ==================================
 # Extract Feature Importances
@@ -1053,9 +1026,6 @@ def normalize_by_procedure_time(saliency_maps, n_common_steps=240):
         normalized_maps.append(rescaled_map)
 
     return np.array(normalized_maps)
-
-
-
 
 def plot_normalized_saliency(normalized_neg_maps, normalized_pos_maps):
     """
