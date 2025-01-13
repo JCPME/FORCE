@@ -117,7 +117,7 @@ def stft_features_from_snippet(
     return stft_2d.astype(np.float32)
 
 
-data_path = 'output_with_bones.pkl'
+data_path = 'data/output_with_bones.pkl'
 df = pd.read_pickle(data_path)
 
 # Check DataFrame columns and sample data
