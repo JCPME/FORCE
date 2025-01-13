@@ -1,7 +1,6 @@
 # %%
 import pandas as pd
 import numpy as np
-import json
 import matplotlib.pyplot as plt
 import seaborn as sns
 import torch
@@ -20,6 +19,29 @@ from tqdm import tqdm
 
 warnings.filterwarnings("ignore")
 sns.set(style="whitegrid")
+
+
+# ==================================
+# Model Training and Evaluation
+# ==================================
+# To run this file, please ensure you have the following files in the 'data' directory:
+# - dataset.pkl
+# The dataset can me retrieved from the following polybox link in the README
+# 
+# Please also make sure to install the packages above using the following commands:
+# pip install -r requirements.txt
+#
+# To run this file locally, please use the following command:
+# python model.py
+#
+#
+# To run this file in Google Colab, please ensure you have the dataset.pkl file uploaded
+# to the Colab environment in the root folder. Change line 291 to the following:
+# data_path = '/content/dataset.pkl'
+# 
+#
+# ==================================
+
 
 # %%
 # ==================================
@@ -269,7 +291,7 @@ def stft_features_from_snippet(
 # ==================================
 # Data Loading
 # ==================================
-data_path = './data/only_bones_procedures.pkl'
+data_path = '../data/dataset.pkl'
 df = pd.read_pickle(data_path)
 
 print("Columns in DataFrame:", df.columns)
