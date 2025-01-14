@@ -52,6 +52,9 @@ conda env create -f environment.yml
 conda activate dl
 ```
 
+3: Download the dataset:
+  Dpwnload the dataset from ... amd put it in data
+
 3: Run the scripts
 ```sh
 python /model/model.py
