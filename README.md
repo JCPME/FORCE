@@ -37,7 +37,7 @@ This is the GitHub repository for the 2024 Deep Learning project at ETHZ.
    cd force
   ```
 
-2: Create avirtual environment
+2: Create a virtual environment
 -  pip
 ```sh
 python3 -m venv .venv
