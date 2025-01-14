@@ -1,4 +1,4 @@
-# FORCE
+# FORCE: Fourier-based Objective Recognition and Classification of (Surgical) Expertise
 
 This is the GitHub repository for the 2024 Deep Learning project at ETHZ.
 
@@ -58,11 +58,11 @@ conda activate dl
 
 4: Run the scripts
 ```sh
-python ./model/model.py
-python ./baselines/logistic_regression.py
-python ./baselines/MLP_feature_engineering.py
-python ./data_analysis/dataset_analytics.py
-python ./interpretability/interpretability.py
+python .\model\model.py
+python .\baselines\logistic_regression.py
+python .\baselines\MLP_feature_engineering.py
+python .\data_analysis\dataset_analytics.py
+python .\interpretability\interpretability.py
 
 ```
 

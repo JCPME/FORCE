@@ -706,7 +706,6 @@ class TemporalBlock(nn.Module):
 
         # >>> SELF-ATTENTION PER BLOCK <<<
         if self.use_attention:
-            # multihead attention wants shape [seq_len, batch_size, embed_dim]
             out_for_attn = out.permute(2, 0, 1)    # => [seq_len, batch, out_channels]
             attn_out, attn_weights = self.attn(out_for_attn, out_for_attn, out_for_attn)
             out_for_attn = out_for_attn + attn_out
