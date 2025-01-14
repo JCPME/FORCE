@@ -670,9 +670,6 @@ class Chomp1d(nn.Module):
         return x[:, :, :-self.chomp_size].contiguous()
 
 class TemporalBlock(nn.Module):
-    """
-    Temporal Convolutional Block with self-attention.
-    """
     def __init__(self, in_channels, out_channels, kernel_size, stride, dilation, padding, dropout=0.2,
                  use_attention=True, n_heads=1):
         super(TemporalBlock, self).__init__()
@@ -726,11 +723,16 @@ class TemporalBlock(nn.Module):
 
         # >>> SELF-ATTENTION PER BLOCK <<<
         if self.use_attention:
+            # multihead attention wants shape [seq_len, batch_size, embed_dim]
             out_for_attn = out.permute(2, 0, 1)    # => [seq_len, batch, out_channels]
             attn_out, attn_weights = self.attn(out_for_attn, out_for_attn, out_for_attn)
+            # shape of attn_out => [seq_len, batch, out_channels]
+            # let's add a residual connection from 'out_for_attn'
             out_for_attn = out_for_attn + attn_out
+            # back to [batch, out_channels, seq_len]
             out = out_for_attn.permute(1, 2, 0)
 
+        # Residual (skip connection)
         res = x if self.downsample is None else self.downsample(x)
 
         if return_attention:
@@ -790,10 +792,10 @@ class TCN_FFN_Model(nn.Module):
         self.ffn = nn.Sequential(
             nn.Linear(additional_input_size, ffn_hidden_sizes[0]),
             nn.ReLU(),
-            nn.Dropout(0.2),
+            nn.Dropout(dropout),
             nn.Linear(ffn_hidden_sizes[0], ffn_hidden_sizes[1]),
             nn.ReLU(),
-            nn.Dropout(0.2)
+            nn.Dropout(dropout)
         )
         self.ffn_output_size = ffn_hidden_sizes[-1]
 
@@ -801,7 +803,7 @@ class TCN_FFN_Model(nn.Module):
         self.classifier = nn.Sequential(
             nn.Linear(self.tcn_output_size + self.ffn_output_size, 64),
             nn.ReLU(),
-            nn.Dropout(0.5),
+            nn.Dropout(dropout),
             nn.Linear(64, 1),
             nn.Sigmoid()
         )
@@ -838,10 +840,10 @@ channels = 7 * freq_bins    # 7 axes (3 translation + 4 rotation)
 
 # Initialize the model
 model = TCN_FFN_Model(
-    tcn_input_channels=channels,        # e.g., 7 * 129 = 903
+    tcn_input_channels=channels,        # 7 * 129 = 903
     num_channels=[64, 64, 64],
     kernel_size=3,
-    dropout=0.2,
+    dropout=0, # removed dropout for best results
     additional_input_size=3,
     ffn_hidden_sizes=[64, 32],
     use_attention=True,
