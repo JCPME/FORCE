@@ -56,7 +56,7 @@ conda activate dl
   Download the dataset from (https://polybox.ethz.ch/index.php/s/VKQ8ELVzIfgBkP8) amd put it in the data folder.\
   The password for the polybox is in the paper.
 
-3: Run the scripts
+4: Run the scripts
 ```sh
 python /model/model.py
 python /baselines/logistic_regression.py
