@@ -59,7 +59,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
 
 # ==================================
-# Helper Functions for Quaternions and Augmentation
+# Helper Functions for Quaternions and Augmentation functions
 # ==================================
 def quaternion_multiply(q1, q2):
     w1, x1, y1, z1 = q1.unbind(-1)
@@ -301,7 +301,7 @@ print("Columns in DataFrame:", df.columns)
 # 2) Create Binary Label (above/below mean avg_grs_score)
 # ------------------------------
 
-# Create binary label based on average GRS score split by participants
+# Create binary label based on average GRS score split by participants and tools
 mean_score = df['avg_grs_score'].mean()
 df['label'] = (df['avg_grs_score'] >= mean_score).astype(int)
 unique_participants = df['participant_num'].unique()
@@ -335,7 +335,8 @@ print(f"Test: {test_df.shape[0]} rows, Participants: {len(test_participants)}")
 # ==================================
 # Data Preprocessing and Augmentation
 # ==================================
-augment_data_flag = True  # Ensure this flag is set
+augment_data_flag = True  
+
 
 def augment_data_in_batches(df, batch_size=128, num_augmentations=7):
     augmented_data = []
@@ -376,10 +377,16 @@ def augment_data_in_batches(df, batch_size=128, num_augmentations=7):
     })
     return new_augmented_df
 
+
+# ==================================
+# Augment Data and Balance Validation Set
+# ==================================
+
+
 if augment_data_flag:
-    train_df = train_df.copy()  # To avoid SettingWithCopyWarning
+    train_df = train_df.copy() 
     train_df['combined_array'] = train_df.apply(combine_translation_rotation, axis=1)
-    # Use the new batch-based augmentation
+
     augmented_df = augment_data_in_batches(train_df, batch_size=128, num_augmentations=7)
 
     print(f"\nOriginal Train Set: {train_df.shape[0]} rows")
@@ -434,11 +441,27 @@ else:
 n_fft = 256
 hop_length = 128
 
+
 def build_feature_matrix(input_df,
                         tool_encoder=None,
                         case_encoder=None,
                         n_fft=256,
                         hop_length=128):
+    """
+    Constructs feature matrices using STFT features and additional numeric features.
+        input_df: DataFrame with augmented data
+        tool_encoder: LabelEncoder object for tools
+        case_encoder: LabelEncoder object for cases
+        n_fft: Number of FFT components
+        hop_length: Number of samples between successive frames
+
+    Returns:
+        X_list: List of tuples containing (stft_2d, extra_feats)
+        y_list: List of labels
+        tool_encoder: Fitted LabelEncoder for tools
+        case_encoder: Fitted LabelEncoder
+    """
+
     if tool_encoder is None:
         tool_encoder = LabelEncoder().fit(input_df['tool'].astype(str))
     if case_encoder is None:
@@ -484,8 +507,7 @@ def build_feature_matrix_test(input_df,
                               n_fft=256,
                               hop_length=128):
     """
-    Constructs feature matrices using STFT features and additional numeric features.
-    Assumes encoders and scalers are already fitted.
+    Constructs feature matrices using STFT features and additional numeric features for the testset.
     """
     X_list = []
     y_list = []
@@ -536,15 +558,12 @@ X_train, y_train, tool_encoder, case_encoder = build_feature_matrix(
 print("\nNumber of Augmented Train Samples:", len(X_train))
 print("Number of Augmented Train Labels:", y_train.shape)
 
-# Extract stft_2d and extra_feats from X_train
 stft_train = np.array([x[0] for x in X_train])  # Shape: (num_samples, channels, time_frames)
 extra_train = np.array([x[1] for x in X_train]) # Shape: (num_samples, 3)
 
-# Initialize scalers
 scaler_stft = StandardScaler()
 scaler_extra = StandardScaler()
 
-# Fit scalers on training data
 num_samples, channels, time_frames = stft_train.shape
 stft_train_reshaped = stft_train.reshape(num_samples, -1)
 with tqdm(total=2, desc="Fitting Scalers") as pbar:
@@ -560,10 +579,8 @@ with tqdm(total=2, desc="Scaling Data") as pbar:
     extra_train_scaled = scaler_extra.transform(extra_train)
     pbar.update(1)
 
-# Recreate X_train as list of tuples with scaled features
 X_train_scaled = list(zip(stft_train_scaled, extra_train_scaled))
 
-# Build feature matrices for validation and test sets
 X_val_scaled, y_val = build_feature_matrix_test(
     val_df,
     tool_encoder=tool_encoder,
@@ -621,12 +638,11 @@ class FFTAdditionalDataset(Dataset):
 # ==================================
 # Create Datasets and DataLoaders
 # ==================================
-# Create Datasets
+
 train_dataset = FFTAdditionalDataset(X_train_scaled, y_train)
 val_dataset   = FFTAdditionalDataset(X_val_scaled, y_val)
 test_dataset  = FFTAdditionalDataset(X_test_scaled, y_test)
 
-# Define DataLoaders
 batch_size = 32
 
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
@@ -654,6 +670,9 @@ class Chomp1d(nn.Module):
         return x[:, :, :-self.chomp_size].contiguous()
 
 class TemporalBlock(nn.Module):
+    """
+    Temporal Convolutional Block with self-attention.
+    """
     def __init__(self, in_channels, out_channels, kernel_size, stride, dilation, padding, dropout=0.2,
                  use_attention=True, n_heads=1):
         super(TemporalBlock, self).__init__()
@@ -707,16 +726,11 @@ class TemporalBlock(nn.Module):
 
         # >>> SELF-ATTENTION PER BLOCK <<<
         if self.use_attention:
-            # multihead attention wants shape [seq_len, batch_size, embed_dim]
             out_for_attn = out.permute(2, 0, 1)    # => [seq_len, batch, out_channels]
             attn_out, attn_weights = self.attn(out_for_attn, out_for_attn, out_for_attn)
-            # shape of attn_out => [seq_len, batch, out_channels]
-            # let's add a residual connection from 'out_for_attn'
             out_for_attn = out_for_attn + attn_out
-            # back to [batch, out_channels, seq_len]
             out = out_for_attn.permute(1, 2, 0)
 
-        # Residual (skip connection)
         res = x if self.downsample is None else self.downsample(x)
 
         if return_attention:
@@ -841,39 +855,33 @@ print("\nModel Initialized and Moved to Device.")
 # ==================================
 # Define Loss Function and Optimizer
 # ==================================
-import torch
 
-# Calculate class weights based on label distribution in the training set
 label_counts = augmented_df['label'].value_counts().to_dict()
 total_samples = len(augmented_df)
 weight_neg = total_samples / (2 * label_counts[0])
 weight_pos = total_samples / (2 * label_counts[1])
 
-# Define weights tensor and move to device
 class_weights = torch.tensor([weight_neg, weight_pos], dtype=torch.float32).to(device)
 
-# Define a weighted BCE loss function
 def weighted_bce_loss(outputs, targets):
     weights = targets * class_weights[1] + (1 - targets) * class_weights[0]
     return torch.nn.functional.binary_cross_entropy(outputs, targets, weight=weights)
 
 criterion = weighted_bce_loss
-#criterion = nn.BCELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)  # Adjusted learning rate
 
 # Define Early Stopping parameters
-patience = 10  # Reduced for demonstration; adjust as needed
+patience = 10  
 best_val_loss = float('inf')
 epochs_no_improve = 0
-n_epochs = 100  # Adjust based on your data
+n_epochs = 100  
 
-# Lists to store training and validation metrics
 train_losses = []
 val_losses = []
 train_accuracies = []
 val_accuracies = []
 
-# Create a tqdm progress bar for epochs
+
 epoch_progress = tqdm(range(n_epochs), desc="Training", position=0)
 
 for epoch in epoch_progress:
@@ -882,7 +890,7 @@ for epoch in epoch_progress:
     correct = 0
     total = 0
 
-    # Create a tqdm progress bar for batches within the current epoch
+
     batch_progress = tqdm(train_loader, desc=f"Epoch {epoch+1}/{n_epochs} - Training", leave=False, position=1)
     for stft_features, additional_feats, mask, labels in batch_progress:
         stft_features = stft_features.to(device)           # [batch_size, channels, time_frames]
@@ -903,7 +911,6 @@ for epoch in epoch_progress:
         correct += (preds == labels).sum().item()
         total += labels.size(0)
 
-        # Optionally, update batch_progress with batch loss
         batch_progress.set_postfix({'Batch Loss': f"{loss.item():.4f}"})
 
     epoch_loss = running_loss / total
@@ -941,7 +948,6 @@ for epoch in epoch_progress:
     val_losses.append(val_epoch_loss)
     val_accuracies.append(val_epoch_acc)
 
-    # Update the epoch progress bar with the latest metrics
     epoch_progress.set_postfix({
         'Train Loss': f"{epoch_loss:.4f}",
         'Train Acc': f"{epoch_acc:.4f}",
@@ -949,11 +955,9 @@ for epoch in epoch_progress:
         'Val Acc': f"{val_epoch_acc:.4f}"
     })
 
-    # Early Stopping
     if val_epoch_loss < best_val_loss:
         best_val_loss = val_epoch_loss
         epochs_no_improve = 0
-        # Save the best model
         torch.save(model.state_dict(), 'best_tcn_ffn_model.pth')
     else:
         epochs_no_improve += 1
@@ -961,7 +965,7 @@ for epoch in epoch_progress:
             epoch_progress.write("Early stopping!")
             break
 
-# Close the progress bars
+
 epoch_progress.close()
 
 # %%
@@ -993,12 +997,12 @@ with torch.no_grad():
         all_labels.extend(labels)
 
 # Classification Report
-print("\nValidation Classification Report:")
+print("\n Test Classification Report:")
 print(classification_report(all_labels, all_preds, target_names=['Below Mean', 'Above Mean']))
 
 # ROC-AUC Score
 roc_auc = roc_auc_score(all_labels, all_probs)
-print(f"Validation ROC-AUC: {roc_auc:.4f}")
+print(f"Test ROC-AUC: {roc_auc:.4f}")
 
 # Confusion Matrix
 cm = confusion_matrix(all_labels, all_preds)
