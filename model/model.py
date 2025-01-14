@@ -15,6 +15,8 @@ import warnings
 from sklearn.metrics import confusion_matrix, classification_report, roc_auc_score, auc, roc_curve
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from tqdm import tqdm
+from sklearn.utils import resample
+
 
 
 warnings.filterwarnings("ignore")
@@ -396,9 +398,6 @@ if augment_data_flag:
     val_df['combined_array'] = val_df.apply(combine_translation_rotation, axis=1)
     augmented_val_df = augment_data_in_batches(val_df, batch_size=128, num_augmentations=7)
 
-    # Balance the Augmented Validation Set
-    from sklearn.utils import resample
-
     # Separate majority and minority classes
     majority = augmented_val_df[augmented_val_df['label'] == augmented_val_df['label'].value_counts().idxmax()]
     minority = augmented_val_df[augmented_val_df['label'] == augmented_val_df['label'].value_counts().idxmin()]
@@ -470,22 +469,18 @@ def build_feature_matrix(input_df,
             row['timestamp_array'],
             n_fft=n_fft,
             hop_length=hop_length,
-            fixed_time_frames=1500  # Padding to 1500
+            fixed_time_frames=1500  
         )
         # shape: [channels, time_frames]
 
-        # 2) Additional numeric features
         tool_val  = tool_encoder.transform([str(row['tool'])])[0]
         case_val  = case_encoder.transform([str(row['case'])])[0]
         tpt_val   = row['total_procedure_time']
 
-        # We'll store these 3 as a separate vector
         extra_feats = np.array([tool_val, case_val, tpt_val], dtype=np.float32)
 
         label = row['label']
 
-        # 3) Save
-        # We'll store stft_2d as is; we won't flatten it. We can handle flattening or not in the dataset later.
         X_list.append((stft_2d, extra_feats))
         y_list.append(label)
 
@@ -511,11 +506,10 @@ def build_feature_matrix_test(input_df,
             row['timestamp_array'],
             n_fft=n_fft,
             hop_length=hop_length,
-            fixed_time_frames=1500  # Padding to 1500
+            fixed_time_frames=1500  
         )
         # shape: [channels, time_frames]
 
-        # Additional numeric features
         tool_val = tool_encoder.transform([str(row['tool'])])[0]
         case_val = case_encoder.transform([str(row['case'])])[0]
         tpt_val  = row['total_procedure_time']
@@ -524,15 +518,12 @@ def build_feature_matrix_test(input_df,
 
         label = row['label']
 
-        # Scale stft_2d
         stft_2d_flat = stft_2d.flatten().reshape(1, -1)
         stft_2d_scaled_flat = scaler_stft.transform(stft_2d_flat)
         stft_2d_scaled = stft_2d_scaled_flat.reshape(stft_2d.shape)
 
-        # Scale extra_feats
         extra_feats_scaled = scaler_extra.transform(extra_feats.reshape(1, -1)).flatten()
 
-        # Append to list as a tuple
         X_list.append((stft_2d_scaled, extra_feats_scaled))
         y_list.append(label)
 
@@ -610,7 +601,7 @@ class FFTAdditionalDataset(Dataset):
         """
         self.X = X   # list of tuples
         self.y = torch.tensor(y, dtype=torch.float32)
-        self.fixed_time_frames = 1500  # Ensure consistency with padding
+        self.fixed_time_frames = 1500  
 
     def __len__(self):
         return len(self.X)
@@ -680,7 +671,7 @@ class TemporalBlock(nn.Module):
         self.relu2 = nn.ReLU()
         self.dropout2 = nn.Dropout(dropout)
 
-        # If in_channels != out_channels, we use a 1×1 conv to match dimensions
+
         self.downsample = nn.Conv1d(in_channels, out_channels, 1) if in_channels != out_channels else None
         self.relu = nn.ReLU()
 
@@ -706,7 +697,7 @@ class TemporalBlock(nn.Module):
         out = self.relu1(out)
         out = self.dropout1(out)
 
-        out = self.conv2(out)  # changed 'x' to 'out'
+        out = self.conv2(out)  
         out = self.chomp2(out)
         out = self.relu2(out)
         out = self.dropout2(out)
@@ -718,8 +709,6 @@ class TemporalBlock(nn.Module):
             # multihead attention wants shape [seq_len, batch_size, embed_dim]
             out_for_attn = out.permute(2, 0, 1)    # => [seq_len, batch, out_channels]
             attn_out, attn_weights = self.attn(out_for_attn, out_for_attn, out_for_attn)
-            # shape of attn_out => [seq_len, batch, out_channels]
-            # let's add a residual connection from 'out_for_attn'
             out_for_attn = out_for_attn + attn_out
             # back to [batch, out_channels, seq_len]
             out = out_for_attn.permute(1, 2, 0)
