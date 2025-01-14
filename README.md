@@ -58,11 +58,11 @@ conda activate dl
 
 4: Run the scripts
 ```sh
-python /model/model.py
-python /baselines/logistic_regression.py
-python /baselines/MLP_feature_engineering.py
-python /data_analysis/dataset_analytics.py
-python /interpretability/interpretability.py
+python ./model/model.py
+python ./baselines/logistic_regression.py
+python ./baselines/MLP_feature_engineering.py
+python ./data_analysis/dataset_analytics.py
+python ./interpretability/interpretability.py
 
 ```
 
