@@ -2,7 +2,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-data_path = "dataset.pkl"
+data_path = "data/dataset.pkl"
 df = pd.read_pickle(data_path)
 
 # Create the label column

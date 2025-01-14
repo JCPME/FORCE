@@ -130,7 +130,7 @@ def stft_features_from_snippet(
 # ==================================
 # Data Loading
 # ==================================
-data_path = 'data/output_with_bones.pkl'
+data_path = 'data/dataset.pkl'
 df = pd.read_pickle(data_path)
 
 # Check DataFrame columns and sample data
@@ -544,7 +544,7 @@ class ModelWrapperStft(torch.nn.Module):
         return self.model(stft_features, additional_feats)
 
 # Load the trained weights
-model.load_state_dict(torch.load("data/best_tcn_ffn_model.pth", map_location=device))
+model.load_state_dict(torch.load("best_tcn_ffn_model.pth", map_location=device))
 model.to(device)
 model.eval()
 
