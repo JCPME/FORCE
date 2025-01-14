@@ -31,14 +31,14 @@ This is the GitHub repository for the 2024 Deep Learning project at ETHZ.
 
 ## Setup
 
- ###Clone the repository:###
+ 1: Clone the repository:
    ```sh
    git clone https://github.com/JCMCP/force.git
    cd force
   ```
 
-###Create avirtual environment###
-####pip####:
+2: Create avirtual environment
+-  pip
 ```sh
 python3 -m venv .venv
 source .venv/bin/activate
@@ -46,7 +46,7 @@ source .venv/bin/activate
 ```sh
 pip install -r requirements_pip.txt
 ```
-####conda:####
+-  conda
 ```sh
 conda env create -f environment.yml
 ```
