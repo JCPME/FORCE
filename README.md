@@ -52,8 +52,9 @@ conda env create -f environment.yml
 conda activate dl
 ```
 
-3: Download the dataset:
-  Dpwnload the dataset from ... amd put it in data
+3: Download the dataset:\
+  Download the dataset from (https://polybox.ethz.ch/index.php/s/VKQ8ELVzIfgBkP8) amd put it in the data folder.\
+  The password for the polybox is in the paper.
 
 3: Run the scripts
 ```sh
