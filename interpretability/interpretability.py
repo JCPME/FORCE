@@ -1,7 +1,5 @@
-# %%
 import pandas as pd
 import numpy as np
-import json
 import matplotlib.pyplot as plt
 import seaborn as sns
 import torch
@@ -22,7 +20,7 @@ from tqdm import tqdm
 from captum.attr import Saliency, IntegratedGradients
 from tqdm import tqdm
 from typing import Tuple, List, Dict, Any
-import numpy as np
+
 
 warnings.filterwarnings("ignore")
 sns.set(style="whitegrid")
@@ -47,23 +45,6 @@ def stft_features_from_snippet(
     hop_length=128,
     fixed_time_frames=1500  # Padding to 1500 time frames
 ):
-    """
-    Returns a 2D time-frequency representation for each of the 7 axes,
-    then merges them so TCN can process (channels, time_frames).
-
-    Parameters:
-        translation_array (np.ndarray): Shape (N, 3)
-        rotation_array (np.ndarray): Shape (N, 4)
-        timestamp_array (np.ndarray): Shape (N,)
-        n_fft (int): Number of FFT components
-        hop_length (int): Number of samples between successive frames
-        fixed_time_frames (int): Desired number of time frames after padding/truncation
-
-    Returns:
-        np.ndarray: 2D array of shape [(7 * freq_bins), fixed_time_frames]
-    """
-    import torch
-    import numpy as np
 
     n = len(translation_array)
     if n < 2:
@@ -147,12 +128,11 @@ def stft_features_from_snippet(
 # ==================================
 # Data Loading
 # ==================================
-data_path = '/Users/julien/Library/Mobile Documents/com~apple~CloudDocs/ETH/Master-Season-1/Deep Learning/project/output_with_bones.pkl'
+data_path = 'data/dataset.pkl'
 df = pd.read_pickle(data_path)
 
 # Check DataFrame columns and sample data
 print("Columns in DataFrame:", df.columns)
-
 
 # ------------------------------
 # 2) Create Binary Label (above/below mean avg_grs_score)
@@ -336,23 +316,16 @@ class FFTAdditionalDataset(Dataset):
         label = self.y[idx]
         return stft_2d, extra_feats, label
 
-# %%
-# ==================================
-# Create Datasets and DataLoaders
-# ==================================
 # Create Datasets
 train_dataset = FFTAdditionalDataset(X_analysis, y_analysis)
-
 
 # Define DataLoaders
 batch_size = 32
 
 analysis_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
 
-
 print("\nDataLoaders Created:")
 print(f"Train Loader: {len(analysis_loader)} batches")
-
 
 class Chomp1d(nn.Module):
     """
@@ -532,7 +505,7 @@ class TCN_FFN_Model(nn.Module):
 # ==================================
 # Load the Trained Model
 # ==================================
-# Initialize your model architecture
+# Initialize model architecture
 model = TCN_FFN_Model(
     tcn_input_channels=903,  # 7 * 129
     num_channels=[64, 64, 64],
@@ -553,7 +526,6 @@ class ModelWrapperExtra(torch.nn.Module):
         self.model = model
 
     def forward(self, additional_feats, stft_features):
-        # Note the order: additional_feats is now the main input
         return self.model(stft_features, additional_feats)
 
 
@@ -569,7 +541,7 @@ class ModelWrapperStft(torch.nn.Module):
         return self.model(stft_features, additional_feats)
 
 # Load the trained weights
-model.load_state_dict(torch.load("/Users/julien/Library/Mobile Documents/com~apple~CloudDocs/ETH/Master-Season-1/Deep Learning/project/best_tcn_ffn_model (1).pth", map_location=device))
+model.load_state_dict(torch.load("best_tcn_ffn_model.pth", map_location=device))
 model.to(device)
 model.eval()
 
@@ -587,22 +559,7 @@ def extract_feature_importance_stft(
     device: torch.device,
     method: str = 'saliency'
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Extract feature attributions for STFT features using Captum, store corresponding labels, inputs, and procedure times.
-
-    Parameters:
-        model_wrapper (torch.nn.Module): The wrapped model for Captum.
-        dataloader (DataLoader): DataLoader to iterate over.
-        device (torch.device): Device to perform computations on.
-        method (str): Attribution method ('saliency' or 'integrated_gradients').
-
-    Returns:
-        Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-            - Attributions for STFT features with shape [N, 903, time_frames].
-            - Corresponding labels with shape [N].
-            - STFT inputs with shape [N, 903, time_frames].
-            - Procedure times with shape [N].
-    """
+    
     if method == 'saliency':
         attr_method = Saliency(model_wrapper)
     elif method == 'integrated_gradients':
@@ -654,27 +611,13 @@ def extract_feature_importance_stft(
 
     return all_attributions_stft, all_labels, all_stfts, all_procedure_times
 
-
 def extract_feature_importance_extra(
     model_wrapper_extra: torch.nn.Module,
     dataloader: DataLoader,
     device: torch.device,
     method: str = 'saliency'
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Extract feature attributions for additional features using Captum and store corresponding labels.
 
-    Parameters:
-        model_wrapper_extra (torch.nn.Module): The wrapped model for Captum.
-        dataloader (DataLoader): DataLoader to iterate over.
-        device (torch.device): Device to perform computations on.
-        method (str): Attribution method ('saliency' or 'integrated_gradients').
-
-    Returns:
-        Tuple[np.ndarray, np.ndarray]:
-            - Attributions for additional features with shape [N, 3].
-            - Corresponding labels with shape [N].
-    """
     if method == 'saliency':
         attr_method = Saliency(model_wrapper_extra)
     elif method == 'integrated_gradients':
@@ -726,17 +669,7 @@ def extract_attention_weights(
     dataloader: DataLoader,
     device: torch.device
 ) -> List[dict]:
-    """
-    Extract attention weights from all layers for each sample in the dataloader and store labels.
 
-    Parameters:
-        model (torch.nn.Module): The trained model.
-        dataloader (DataLoader): DataLoader to iterate over.
-        device (torch.device): Device to perform computations on.
-
-    Returns:
-        List[dict]: Each dictionary contains 'label', 'pred', 'prob', and 'attentions' for a sample.
-    """
     model.eval()
     attention_data = []
 
@@ -790,6 +723,60 @@ def extract_attention_weights(
     return attention_data
 
 
+def separate_axes(saliency_maps):
+    """
+    Split the saliency maps into 7 axes with shape [7 * N, FREQ_BINS_PER_AXIS, TIME_FRAMES].
+
+    Parameters:
+        saliency_maps (np.ndarray): Saliency maps, shape [N, 903, TIME_FRAMES].
+
+    Returns:
+        np.ndarray: Combined saliency maps for all axes, shape [7 * N, FREQ_BINS_PER_AXIS, TIME_FRAMES].
+    """
+    separated_maps = []
+    for i in range(NUM_AXES):
+        start_idx = i * FREQ_BINS_PER_AXIS
+        end_idx = (i + 1) * FREQ_BINS_PER_AXIS
+        # Extract axis-specific maps
+        separated_maps.append(saliency_maps[:, start_idx:end_idx, :])
+    
+    # Stack along the batch dimension
+    combined_maps = np.concatenate(separated_maps, axis=0)  # Shape: [7 * N, FREQ_BINS_PER_AXIS, TIME_FRAMES]
+    return combined_maps
+
+
+
+def plot_saliency_multiplied_with_input(
+    saliency_maps: np.ndarray,
+    stfts: np.ndarray,
+    sample_indices: List[int],
+    time_range: Tuple[int, int] = None
+):
+
+    for idx in sample_indices:
+        saliency_map = saliency_maps[idx]
+        stft = stfts[idx]
+
+        # Multiply saliency with input
+        saliency_weighted_stft = saliency_map * stft  # Shape: (channels, time_frames)
+
+        # Crop time range if specified
+        if time_range:
+            start, end = time_range
+            saliency_weighted_stft = saliency_weighted_stft[:, start:end]
+
+        # Plot the result
+        plt.figure(figsize=(12, 6))
+        sns.heatmap(
+            saliency_weighted_stft,  # Keep 2D array intact
+            cmap="bwr",
+            cbar=True
+        )
+        plt.title(f"Saliency Weighted STFT - Sample {idx}")
+        plt.xlabel("Time Frames")
+        plt.ylabel("Channels")
+        plt.show()
+
 # ==================================
 # Extract Feature Importances
 # ==================================
@@ -820,98 +807,13 @@ train_attention_data = extract_attention_weights(model, analysis_loader, device)
 NUM_AXES = 7  # x, y, z, quat1, quat2, quat3, quat4
 FREQ_BINS_PER_AXIS = 129
 
-def separate_axes(saliency_maps):
-    """
-    Split the saliency maps into 7 axes with shape [7 * N, FREQ_BINS_PER_AXIS, TIME_FRAMES].
-
-    Parameters:
-        saliency_maps (np.ndarray): Saliency maps, shape [N, 903, TIME_FRAMES].
-
-    Returns:
-        np.ndarray: Combined saliency maps for all axes, shape [7 * N, FREQ_BINS_PER_AXIS, TIME_FRAMES].
-    """
-    separated_maps = []
-    for i in range(NUM_AXES):
-        start_idx = i * FREQ_BINS_PER_AXIS
-        end_idx = (i + 1) * FREQ_BINS_PER_AXIS
-        # Extract axis-specific maps
-        separated_maps.append(saliency_maps[:, start_idx:end_idx, :])
-    
-    # Stack along the batch dimension
-    combined_maps = np.concatenate(separated_maps, axis=0)  # Shape: [7 * N, FREQ_BINS_PER_AXIS, TIME_FRAMES]
-    return combined_maps
-
-
-
-def plot_saliency_multiplied_with_input(
-    saliency_maps: np.ndarray,
-    stfts: np.ndarray,
-    sample_indices: List[int],
-    time_range: Tuple[int, int] = None
-):
-    """
-    Plot saliency maps multiplied with corresponding STFTs.
-
-    Parameters:
-        saliency_maps (np.ndarray): Saliency maps, shape [N, channels, time_frames].
-        stfts (np.ndarray): STFT inputs, shape [N, channels, time_frames].
-        sample_indices (List[int]): Indices of samples to visualize.
-        time_range (Tuple[int, int], optional): Range of time frames to crop (start, end).
-    """
-    for idx in sample_indices:
-        saliency_map = saliency_maps[idx]
-        stft = stfts[idx]
-
-        # Multiply saliency with input
-        saliency_weighted_stft = saliency_map * stft  # Shape: (channels, time_frames)
-
-        # Crop time range if specified
-        if time_range:
-            start, end = time_range
-            saliency_weighted_stft = saliency_weighted_stft[:, start:end]
-
-        # Plot the result
-        plt.figure(figsize=(12, 6))
-        sns.heatmap(
-            saliency_weighted_stft,  # Keep 2D array intact
-            cmap="bwr",
-            cbar=True
-        )
-        plt.title(f"Saliency Weighted STFT - Sample {idx}")
-        plt.xlabel("Time Frames")
-        plt.ylabel("Channels")
-        plt.show()
-
-
-plot_saliency_multiplied_with_input(saliency_maps=train_attrib_stft, stfts=all_stft_inputs, sample_indices=range(2), time_range=(0, 500))
-
-def all_saliency_weighted_stft(saliency_maps, stfts, time_range=None):
-    list = []
-    for idx, stft in enumerate(stfts):
-        saliency_map = saliency_maps[idx]
-
-        # Multiply saliency with input
-        saliency_weighted_stft = saliency_map * stft  # Shape: (channels, time_frames)
-        list.append(saliency_weighted_stft)
-
-    return np.array(list)
-
-        
 def overlay_saliency_weighted_inputs(
     saliency_maps: np.ndarray,
     stfts: np.ndarray,
     labels: np.ndarray,
     time_range: Tuple[int, int] = None
 ):
-    """
-    Multiply saliency maps with STFTs and overlay the results for positive, negative, and all samples.
 
-    Parameters:
-        saliency_maps (np.ndarray): Saliency maps, shape [N, channels, time_frames].
-        stfts (np.ndarray): STFT inputs, shape [N, channels, time_frames].
-        labels (np.ndarray): Binary labels for the samples, shape [N].
-        time_range (Tuple[int, int], optional): Range of time frames to crop (start, end).
-    """
     # Filter saliency maps and STFTs based on labels
     pos_indices = np.where(labels == 1)[0]
     neg_indices = np.where(labels == 0)[0]
@@ -946,25 +848,20 @@ def overlay_saliency_weighted_inputs(
         plt.ylabel("Channels")
         plt.show()
 
-overlay_saliency_weighted_inputs(
-    saliency_maps=train_attrib_stft,
-    stfts=all_stft_inputs,
-    labels=train_labels_stft,
-    time_range=(0, 240)
-)
+def all_saliency_weighted_stft(saliency_maps, stfts, time_range=None):
+    list = []
+    for idx, stft in enumerate(stfts):
+        saliency_map = saliency_maps[idx]
+
+        # Multiply saliency with input
+        saliency_weighted_stft = saliency_map * stft  # Shape: (channels, time_frames)
+        list.append(saliency_weighted_stft)
+
+    return np.array(list)
 
 # Define a helper function for plotting summed saliency-weighted STFTs
 def plot_summed_saliency(saliency_data, sum_axis, title, xlabel, ylabel):
-    """
-    Plots the sum of saliency-weighted STFTs along a specified axis.
 
-    Parameters:
-        saliency_data (np.ndarray): Saliency-weighted STFT data.
-        sum_axis (int): Axis along which to sum (0 for frequency, 1 for time).
-        title (str): Title of the plot.
-        xlabel (str): Label for the x-axis.
-        ylabel (str): Label for the y-axis.
-    """
     summed_saliency = np.sum(saliency_data, axis=sum_axis)  # Sum along the specified axis
     mean_saliency = np.mean(summed_saliency, axis=0)        # Average across samples
 
@@ -976,28 +873,16 @@ def plot_summed_saliency(saliency_data, sum_axis, title, xlabel, ylabel):
     plt.grid()
     plt.show()
 
-# Compute saliency-weighted STFTs for positive, negative, and all samples
-saliency_weighted_stft = all_saliency_weighted_stft(saliency_maps=train_attrib_stft, stfts=all_stft_inputs)
 
-positive_indices_stft = np.where(train_labels_stft == 1)[0]
-negative_indices_stft = np.where(train_labels_stft == 0)[0]
-
-saliency_weighted_stft_pos = (saliency_weighted_stft[positive_indices_stft])
-saliency_weighted_stft_neg = saliency_weighted_stft[negative_indices_stft]
-saliency_weighted_stft_all = saliency_weighted_stft
-
+overlay_saliency_weighted_inputs(
+    saliency_maps=train_attrib_stft,
+    stfts=all_stft_inputs,
+    labels=train_labels_stft,
+    time_range=(0, 240)
+)
 
 def reduce_frequency_resolution(saliency_maps, target_bins=100):
-    """
-    Reduce the frequency resolution of saliency maps to the target number of bins using interpolation.
 
-    Parameters:
-        saliency_maps (np.ndarray): Saliency-weighted STFT maps of shape [N, freq_bins, time_steps].
-        target_bins (int): Number of frequency bins to reduce to.
-
-    Returns:
-        np.ndarray: Saliency maps with reduced frequency resolution [N, target_bins, time_steps].
-    """
     original_bins = saliency_maps.shape[1]
     new_bin_indices = np.linspace(0, original_bins - 1, target_bins)
 
@@ -1013,16 +898,7 @@ def reduce_frequency_resolution(saliency_maps, target_bins=100):
 
 
 def normalize_by_procedure_time(saliency_maps, n_common_steps=240):
-    """
-    Normalize saliency maps by the duration of their non-zero signals.
 
-    Parameters:
-        saliency_maps (np.ndarray): Saliency-weighted STFT maps of shape [N, 903, time_steps].
-        n_common_steps (int): Number of common steps to interpolate to.
-
-    Returns:
-        np.ndarray: Normalized saliency maps of shape [N, 903, n_common_steps].
-    """
     if not isinstance(n_common_steps, int):  # Ensure n_common_steps is an integer
         raise ValueError("n_common_steps must be an integer.")
 
@@ -1054,17 +930,8 @@ def normalize_by_procedure_time(saliency_maps, n_common_steps=240):
 
     return np.array(normalized_maps)
 
-
-
-
 def plot_normalized_saliency(normalized_neg_maps, normalized_pos_maps):
-    """
-    Plot the normalized saliency map summed along either frequency or time.
 
-    Parameters:
-        normalized_maps (np.ndarray): Array of normalized saliency maps.
-        title (str): Plot title.
-    """
     # Sum along frequency and time axes
     summed_time_neg = np.sum(normalized_neg_maps, axis=1)  # (samples, time)
     summed_freq_neg = np.sum(normalized_neg_maps, axis=2)  # (samples, freq)
@@ -1099,6 +966,20 @@ def plot_normalized_saliency(normalized_neg_maps, normalized_pos_maps):
     plt.ylim([-2e-5, 10e-5])
     plt.legend()
     plt.show()
+
+plot_saliency_multiplied_with_input(saliency_maps=train_attrib_stft, stfts=all_stft_inputs, sample_indices=range(2), time_range=(0, 500))
+
+
+
+# Compute saliency-weighted STFTs for positive, negative, and all samples
+saliency_weighted_stft = all_saliency_weighted_stft(saliency_maps=train_attrib_stft, stfts=all_stft_inputs)
+
+positive_indices_stft = np.where(train_labels_stft == 1)[0]
+negative_indices_stft = np.where(train_labels_stft == 0)[0]
+
+saliency_weighted_stft_pos = (saliency_weighted_stft[positive_indices_stft])
+saliency_weighted_stft_neg = saliency_weighted_stft[negative_indices_stft]
+saliency_weighted_stft_all = saliency_weighted_stft
 
 # Reduce frequency resolution before normalization
 reduced_saliency_weighted_stft_pos = reduce_frequency_resolution(separate_axes(saliency_weighted_stft_pos), target_bins=100)

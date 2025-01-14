@@ -51,7 +51,7 @@ def load_surgical_data(data_path):
 
 
 
-data_path = "dataset.pkl"
+data_path = "data/dataset.pkl"
 recordings_unfiltered, scores_unfiltered = load_surgical_data(data_path)
 
 print(f"Loaded {len(recordings_unfiltered)} total recordings")
