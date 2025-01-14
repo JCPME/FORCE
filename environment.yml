@@ -1,5 +1,6 @@
 name: dl
 channels:
+  - conda-forge
   - defaults
   - https://repo.anaconda.com/pkgs/main
   - https://repo.anaconda.com/pkgs/r
@@ -13,4 +14,6 @@ dependencies:
   - ipykernel
   - torchvision
   - streamlit
+  - pip:
+    - captum==0.7.0
 prefix: /opt/anaconda3/envs/dl
