@@ -37,14 +37,19 @@ This is the GitHub repository for the 2024 Deep Learning project at ETHZ.
    cd force
 
 2. **Create avirtual environment**
+pip:
 ```sh
 python3 -m venv .venv
 source .venv/bin/activate
 ```
-3. **Install Dependencies**
+conda: 
 ```sh
+conda env create -f environment.yml
+```
 
+
+3. **Install Dependencies**
+pip:
+```sh
 pip install -r requirements_pip.txt
-conda install --file requirements.txt # For conda environments
-
 ```
