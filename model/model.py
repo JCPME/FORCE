@@ -23,18 +23,11 @@ sns.set(style="whitegrid")
 """
 Installation Instructions:
 --------------------------
-You can install the required packages using pip. For example:
-
-    pip install -r requirements.txt
-
-Or conda (if you are using Anaconda distribution):
-    conda install requirements.txt
-
 If you are running this script within a Jupyter Notebook, ensure that your kernel is using the correct Python version and has these packages installed.
 
 Additional Notes:
     - If you are utilizing GPU acceleration, make sure PyTorch is installed with CUDA support.
-    - Verify that your data file (e.g., 'dataset.pkl') is accessible at ../data/dataset.pkl.
+    - Verify that your data file (e.g., 'dataset.pkl') is accessible at ./data/dataset.pkl.
 
 --------------------------
 """
