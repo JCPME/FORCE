@@ -289,7 +289,7 @@ def stft_features_from_snippet(
 # ==================================
 # Data Loading
 # ==================================
-data_path = '../data/dataset.pkl'
+data_path = './data/dataset.pkl'
 df = pd.read_pickle(data_path)
 
 print("Columns in DataFrame:", df.columns)
