@@ -541,7 +541,7 @@ class ModelWrapperStft(torch.nn.Module):
         return self.model(stft_features, additional_feats)
 
 # Load the trained weights
-model.load_state_dict(torch.load("best_tcn_ffn_model.pth", map_location=device))
+model.load_state_dict(torch.load("data/best_tcn_ffn_model.pth", map_location=device))
 model.to(device)
 model.eval()
 
