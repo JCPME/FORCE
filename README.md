@@ -2,6 +2,11 @@
 
 This is the GitHub repository for the 2024 Deep Learning project at ETHZ.
 
+Contributors:
+Samuel Sutanto: ssutanto@student.ethz.ch
+Julien Poffet: jpoffet@student.ethz.ch
+Simon Froelich: sfroelich@student.ethz.ch
+
 ## Project Structure
 
 - **baselines/**
@@ -29,7 +34,7 @@ This is the GitHub repository for the 2024 Deep Learning project at ETHZ.
   - [.gitignore](.gitignore)
   - [README.md](README.md)
 
-## Setup
+## Setup (Make sure Python 3.11 is installed)
 
  1: Clone the repository:
    ```sh
