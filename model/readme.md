@@ -32,27 +32,6 @@ The code performs the following:
    - Evaluates the final model on a test set, producing classification metrics, ROC curves, and confusion matrices.
    - Visualizes training progress (loss and accuracy over epochs).
 
-## Installation
-
-This project requires Python 3.7+ and several dependencies. You can install all required libraries via pip or conda.
-
-### Using pip
-
-```bash
-pip install -r requirements.txt
-```
-
-
-### Using Conda
-
-You can also install the dependencies via Conda if you are using the Anaconda distribution:
-
-```bash
-conda create --name myenv python=3.11
-conda activate myenv
-conda install -r requirements.txt
-
-```
 
 ## Data
 
