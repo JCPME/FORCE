@@ -1,11 +1,15 @@
 # FORCE: Fourier-based Objective Recognition and Classification of (Surgical) Expertise
 
-This is the GitHub repository for the 2024 Deep Learning project at ETHZ.
+This repository contains the source code for the 2024 Deep Learning project at ETH Zurich. The FORCE model leverages both time and frequency domain information to provide objective assessments of surgical skill based on pose data.
 
-Contributors:
-Samuel Sutanto: ssutanto@student.ethz.ch
-Julien Poffet: jpoffet@student.ethz.ch
-Simon Froelich: sfroelich@student.ethz.ch
+## Contributors
+- Samuel Sutanto: ssutanto@student.ethz.ch
+- Julien Poffet: jpoffet@student.ethz.ch
+- Simon Frölich: sfroelich@student.ethz.ch
+
+## Project Overview
+In the realm of surgical training, objective skill assessment is key to reducing human bias. FORCE uses Short Time Fourier Transform (STFT) for frequency-based feature extraction and Temporal Convolutional Networks (TCN) enhanced with attention mechanisms, combining these to effectively classify surgical expertise.
+
 
 ## Project Structure
 
