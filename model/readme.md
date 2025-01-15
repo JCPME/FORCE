@@ -50,17 +50,22 @@ The code performs the following:
 - **Label Creation:**  
   A binary label is generated based on whether the average GRS score is above or below the global mean.
 
-## Usage
+## Usage Model
 
 After installing the dependencies and preparing your data, you can run the main script. The pipeline includes data loading, augmentation, feature extraction, model training, and evaluation.
-
-For example, run the main script from your command line:
+Then run this file from the root folder.
 
 ```bash
-python model.py
+python .\model\model.py
 ```
 
 If you are using a Jupyter Notebook, ensure that the notebook’s kernel has access to the required packages and that your dataset path is correct.
+
+## Usage jigsaws.py 
+Upload the the jigsawsdataset.pkl into the data folder, then run this file from the root folder.
+```bash
+python .\model\jigsaws.py
+```
 
 ## Code Structure
 
@@ -83,4 +88,7 @@ If you are using a Jupyter Notebook, ensure that the notebook’s kernel has acc
 
 - **Training and Evaluation:**  
   The model is trained using the Adam optimizer with an early stopping mechanism based on validation loss. Classification metrics and ROC curves are generated to evaluate performance on the test set.
+
+
+
 

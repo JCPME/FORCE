@@ -29,7 +29,7 @@ If you are running this script within a Jupyter Notebook, ensure that your kerne
 
 Additional Notes:
     - If you are utilizing GPU acceleration, make sure PyTorch is installed with CUDA support.
-    - Verify that your data file (e.g., 'dataset.pkl') is accessible at ./data/dataset.pkl.
+    - Verify that your data file (e.g., 'jigsawsdataset.pkl') is accessible at ./data/jigsawsdataset.pkl.
 
 --------------------------
 """
@@ -212,7 +212,8 @@ def stft_features_from_snippet(
     Returns:
         np.ndarray: 2D array of shape [(7 * freq_bins), fixed_time_frames]
     """
-
+    import torch
+    import numpy as np
 
     n = len(translation_array)
     if n < 2:
@@ -283,7 +284,7 @@ def stft_features_from_snippet(
 # ==================================
 # Data Loading
 # ==================================
-data_path = './data/dataset.pkl'
+data_path = './data/jigsawsdataset.pkl'
 df = pd.read_pickle(data_path)
 
 print("Columns in DataFrame:", df.columns)
@@ -293,37 +294,72 @@ print("Columns in DataFrame:", df.columns)
 # ------------------------------
 # 2) Create Binary Label (above/below mean avg_grs_score)
 # ------------------------------
-
-# Create binary label based on average GRS score split by participants and tools
-mean_score = df['avg_grs_score'].mean()
+participant_means = df.groupby('participant_num')['avg_grs_score'].mean()
+mean_score = participant_means.mean()
 df['label'] = (df['avg_grs_score'] >= mean_score).astype(int)
-unique_participants = df['participant_num'].unique()
+unique_cases = df['case'].unique()
+
+unique_cases = unique_cases.tolist()
+random.shuffle(unique_cases)
+
+n_cases_total = len(unique_cases)
+n_cases_test = int(0.2 * n_cases_total)
+n_cases_val = int(0.2 * n_cases_total)
+n_cases_train = n_cases_total - n_cases_test - n_cases_val
+
+test_cases = unique_cases[:n_cases_test]
+val_cases = unique_cases[n_cases_test:n_cases_test + n_cases_val]
+train_cases = unique_cases[n_cases_test + n_cases_val:]
+
+# Random shuffle 
+tools_to_include = ['master', 'slave']
+filtered_df = df[df['tool'].isin(tools_to_include)]
+
+print("\nFiltered DataFrame Description:")
+print(filtered_df.describe())
+
+train_df = filtered_df[filtered_df['case'].isin(train_cases)]
+val_df   = filtered_df[filtered_df['case'].isin(val_cases)]
+test_df  = filtered_df[filtered_df['case'].isin(test_cases)]
+
+print(f"Total unique cases: {n_cases_total}")
+print(f"Train cases: {len(train_cases)} | Validation cases: {len(val_cases)} | Test cases: {len(test_cases)}")
+
+print("\nRows per set:")
+print(f"Train: {len(train_df)}")
+print(f"Validation: {len(val_df)}")
+print(f"Test: {len(test_df)}")
 
 
-unique_participants = unique_participants.tolist()
-random.shuffle(unique_participants)
+"""
+# Random shuffle 
+tools_to_include = ['master', 'slave']
+filtered_df = df[df['tool'].isin(tools_to_include)]
 
-n_total = len(unique_participants)
+print("\nFiltered DataFrame Description:")
+print(filtered_df.describe())
+
+# Shuffle the dataframe randomly.
+# You can set a random_state for reproducibility.
+shuffled_df = filtered_df.sample(frac=1, random_state=42).reset_index(drop=True)
+
+# Compute the number of rows for each set.
+n_total = len(shuffled_df)
 n_test  = int(0.2 * n_total)
 n_val   = int(0.2 * n_total)
 n_train = n_total - n_test - n_val
 
-test_participants = unique_participants[:n_test]
-val_participants  = unique_participants[n_test:n_test + n_val]
-train_participants = unique_participants[n_test + n_val:]
+# Split the DataFrame by index slicing.
+test_df  = shuffled_df.iloc[:n_test]
+val_df   = shuffled_df.iloc[n_test:n_test + n_val]
+train_df = shuffled_df.iloc[n_test + n_val:]
+"""
 
-tools_to_include = ['Ulna_1', 'Ulna_2', 'Radius_1', 'Radius_2']
-filtered_df = df[df['tool'].isin(tools_to_include)]
-print("\nFiltered DataFrame Description:")
-print(filtered_df.describe())
+print(f"\nTrain: {train_df.shape[0]} rows")
+print(f"Validation: {val_df.shape[0]} rows")
+print(f"Test: {test_df.shape[0]} rows")
 
-train_df = filtered_df[filtered_df['participant_num'].isin(train_participants)]
-val_df   = filtered_df[filtered_df['participant_num'].isin(val_participants)]
-test_df  = filtered_df[filtered_df['participant_num'].isin(test_participants)]
 
-print(f"\nTrain: {train_df.shape[0]} rows, Participants: {len(train_participants)}")
-print(f"Validation: {val_df.shape[0]} rows, Participants: {len(val_participants)}")
-print(f"Test: {test_df.shape[0]} rows, Participants: {len(test_participants)}")
 
 # ==================================
 # Data Preprocessing and Augmentation
@@ -332,42 +368,47 @@ augment_data_flag = True
 
 
 def augment_data_in_batches(df, batch_size=128, num_augmentations=7):
-    augmented_data = []
-    augmented_labels = []
-    augmented_tool = []
-    augmented_case = []
-    augmented_procedure_time = []
+    participant_nums = []
+    tools = []
+    cases = []
+    translation_arrays = []
+    rotation_arrays = []
+    timestamp_arrays = []
+    avg_grs_scores = []
+    procedure_times = []
+    labels = []
 
+    # Loop over batches
     for start in range(0, len(df), batch_size):
         end = start + batch_size
         batch_df = df.iloc[start:end]
         for idx, row in batch_df.iterrows():
             original_combined = row['combined_array']
-            label = row['label']
-            tool = row['tool']
-            case = row['case']
-            total_time = row['total_procedure_time']
-
+            # Get augmented samples (assume the function returns a list)
             augmented_samples = augment_data(original_combined, num_augmentations=num_augmentations)
-
             for sample in augmented_samples:
-                augmented_data.append(sample)
-                augmented_labels.append(label)
-                augmented_tool.append(tool)
-                augmented_case.append(case)
-                augmented_procedure_time.append(total_time)
-
+                participant_nums.append(row['participant_num'])
+                tools.append(row['tool'])
+                cases.append(row['case'])
+                translation_arrays.append(sample[:, :3])
+                rotation_arrays.append(sample[:, 3:])
+                timestamp_arrays.append(row['timestamp_array'])
+                avg_grs_scores.append(row['avg_grs_score'])
+                procedure_times.append(row['total_procedure_time'])
+                labels.append(row['label'])
+                
     new_augmented_df = pd.DataFrame({
-        'participant_num': np.repeat(df['participant_num'].values, 8),
-        'tool': np.repeat(df['tool'].values, 8),
-        'case': np.repeat(df['case'].values, 8),
-        'translation_array': [sample[:, :3] for sample in augmented_data],
-        'rotation_array': [sample[:, 3:] for sample in augmented_data],
-        'timestamp_array': np.repeat(df['timestamp_array'].values, 8),
-        'avg_grs_score': np.repeat(df['avg_grs_score'].values, 8),
-        'total_procedure_time': np.repeat(df['total_procedure_time'].values, 8),
-        'label': augmented_labels
-    })
+        'participant_num': participant_nums,
+        'tool': tools,
+        'case': cases,
+        'translation_array': translation_arrays,
+        'rotation_array': rotation_arrays,
+        'timestamp_array': timestamp_arrays,
+        'avg_grs_score': avg_grs_scores,
+        'total_procedure_time': procedure_times,
+        'label': labels
+})
+
     return new_augmented_df
 
 
@@ -380,7 +421,7 @@ if augment_data_flag:
     train_df = train_df.copy() 
     train_df['combined_array'] = train_df.apply(combine_translation_rotation, axis=1)
 
-    augmented_df = augment_data_in_batches(train_df, batch_size=128, num_augmentations=7)
+    augmented_df = augment_data_in_batches(train_df, batch_size=128, num_augmentations=3)
 
     print(f"\nOriginal Train Set: {train_df.shape[0]} rows")
     print(f"Augmented Train Set: {augmented_df.shape[0]} rows")
@@ -393,18 +434,21 @@ if augment_data_flag:
     print(augmented_df['label'].value_counts())
 
     # Augment Validation Set
-    val_df = val_df.copy()  
+    val_df = val_df.copy()  # To avoid SettingWithCopyWarning
     val_df['combined_array'] = val_df.apply(combine_translation_rotation, axis=1)
-    augmented_val_df = augment_data_in_batches(val_df, batch_size=128, num_augmentations=7)
+    augmented_val_df = augment_data_in_batches(val_df, batch_size=128, num_augmentations=3)
 
+    # Separate majority and minority classes
     majority = augmented_val_df[augmented_val_df['label'] == augmented_val_df['label'].value_counts().idxmax()]
     minority = augmented_val_df[augmented_val_df['label'] == augmented_val_df['label'].value_counts().idxmin()]
 
+    # Upsample minority class
     minority_upsampled = resample(minority,
                                   replace=True,
                                   n_samples=len(majority),
                                   random_state=42)
 
+    # Combine majority and upsampled minority
     augmented_val_df_balanced = pd.concat([majority, minority_upsampled])
 
     val_df = augmented_val_df_balanced
@@ -458,6 +502,7 @@ def build_feature_matrix(input_df,
     y_list = []
 
     for idx, row in tqdm(input_df.iterrows(), total=input_df.shape[0], desc="Building Features"):
+        # 1) Get STFT for this snippet
         stft_2d = stft_features_from_snippet(
             row['translation_array'],
             row['rotation_array'],
@@ -469,10 +514,10 @@ def build_feature_matrix(input_df,
         # shape: [channels, time_frames]
 
         tool_val  = tool_encoder.transform([str(row['tool'])])[0]
-        case_val  = case_encoder.transform([str(row['case'])])[0]
+        #case_val  = case_encoder.transform([str(row['case'])])[0]
         tpt_val   = row['total_procedure_time']
 
-        extra_feats = np.array([tool_val, case_val, tpt_val], dtype=np.float32)
+        extra_feats = np.array([tool_val, tpt_val], dtype=np.float32)
 
         label = row['label']
 
@@ -506,10 +551,10 @@ def build_feature_matrix_test(input_df,
         # shape: [channels, time_frames]
 
         tool_val = tool_encoder.transform([str(row['tool'])])[0]
-        case_val = case_encoder.transform([str(row['case'])])[0]
+        #case_val = case_encoder.transform([str(row['case'])])[0]
         tpt_val  = row['total_procedure_time']
 
-        extra_feats = np.array([tool_val, case_val, tpt_val], dtype=np.float32)
+        extra_feats = np.array([tool_val,  tpt_val], dtype=np.float32)
 
         label = row['label']
 
@@ -541,6 +586,8 @@ extra_train = np.array([x[1] for x in X_train]) # Shape: (num_samples, 3)
 
 scaler_stft = StandardScaler()
 scaler_extra = StandardScaler()
+
+
 
 num_samples, channels, time_frames = stft_train.shape
 stft_train_reshaped = stft_train.reshape(num_samples, -1)
@@ -605,6 +652,7 @@ class FFTAdditionalDataset(Dataset):
         stft_2d, extra_feats = self.X[idx]
         # Create mask: 1 for valid frames, 0 for padded
         mask = (stft_2d.sum(axis=0) != 0).astype(float)
+        # Convert to torch tensors
         stft_2d = torch.tensor(stft_2d, dtype=torch.float32)
         extra_feats = torch.tensor(extra_feats, dtype=torch.float32)
         mask = torch.tensor(mask, dtype=torch.float32)
@@ -818,7 +866,7 @@ model = TCN_FFN_Model(
     num_channels=[64, 64, 64],
     kernel_size=3,
     dropout=0, # removed dropout for best results
-    additional_input_size=3,
+    additional_input_size=2,
     ffn_hidden_sizes=[64, 32],
     use_attention=True,
     n_heads=1
@@ -844,13 +892,13 @@ def weighted_bce_loss(outputs, targets):
     return torch.nn.functional.binary_cross_entropy(outputs, targets, weight=weights)
 
 criterion = weighted_bce_loss
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)  
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)  # Adjusted learning rate
 
 # Define Early Stopping parameters
 patience = 10  
 best_val_loss = float('inf')
 epochs_no_improve = 0
-n_epochs = 100  
+n_epochs = 200  
 
 train_losses = []
 val_losses = []
