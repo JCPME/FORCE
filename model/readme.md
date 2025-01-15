@@ -66,6 +66,7 @@ Upload the the jigsawsdataset.pkl into the data folder, then run this file from 
 ```bash
 python .\model\jigsaws.py
 ```
+To reconstruct the .pkl file, read the instructions in /data/extraction_jigsaws.py
 
 ## Code Structure
 
